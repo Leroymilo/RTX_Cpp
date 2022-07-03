@@ -2,9 +2,40 @@
 
 #include <json/value.h>
 #include <json/json.h>
+
 #include <fstream>
+#include <list>
 
 #include <SFML/Graphics.hpp>
+
+//operator<< overloads for debugpurposes :
+
+std::ostream& operator<<(std::ostream& os, const Point& p)
+{
+    os << "(" << p.x;
+    os << ", " << p.y;
+    os << ", " << p.z << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const Vect& v)
+{
+    os << "(" << v.x;
+    os << ", " << v.y;
+    os << ", " << v.z << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, Color& col)
+{
+    os << "(" << +col.r;
+    os << ", " << +col.g;
+    os << ", " << +col.b << ")";
+    return os;
+}
+
+
+//Variables declaration :
 
 int nb_spheres;
 std::vector<Sphere> spheres;
@@ -17,9 +48,12 @@ float screen_h;
 unsigned int screen_pxl_w;
 unsigned int screen_pxl_h;
 
+int max_reflect;
+
 Point camera_pos;
 sf::Image render;
-sf::Color bg_color;
+Color bg_color;
+sf::Color sf_bg_color;
 
 void read_settings()
 {
@@ -42,11 +76,14 @@ void read_settings()
         actualJson["camera_virt_pos"]["z"].asFloat()
     );
 
-    bg_color = sf::Color(
+    bg_color = Color(
         actualJson["background_color"]["r"].asInt(),
         actualJson["background_color"]["g"].asInt(),
         actualJson["background_color"]["b"].asInt()
     );
+    sf_bg_color = sf::Color(bg_color.r, bg_color.g, bg_color.b);
+
+    max_reflect = actualJson["max_reflections"].asInt();
 
     //Parsing spheres :
     file = std::ifstream("settings/spheres.json");
@@ -61,14 +98,15 @@ void read_settings()
             actualJson["spheres"][i]["y"].asFloat(),
             actualJson["spheres"][i]["z"].asFloat()
         );
-        float radius = actualJson["spheres"][i]["radius"].asInt();
+        float radius = actualJson["spheres"][i]["radius"].asFloat();
         Diff_coef color(
             actualJson["spheres"][i]["r"].asFloat(),
             actualJson["spheres"][i]["g"].asFloat(),
             actualJson["spheres"][i]["b"].asFloat()
         );
+        float Kr = actualJson["spheres"][i]["Kr"].asFloat();
 
-        spheres.push_back(Sphere(center, radius, color));
+        spheres.push_back(Sphere(center, radius, color, Kr));
     }
 
     //Parsing light sources :
@@ -92,10 +130,9 @@ void read_settings()
 
         sources.push_back(Source(position, color));
     }
-
 }
 
-bool is_visible(int sphere_i, Point P, Source S)
+bool is_visible(int sphere_i, Point& P, Source& S)
 {
     Sphere* sphere = &spheres[sphere_i];
 
@@ -125,13 +162,9 @@ bool is_visible(int sphere_i, Point P, Source S)
     return true;
 }
 
-void trace_ray(int pxl_y, int pxl_z)
+int intersect(Ray& ray, Point* intersection, int prev_sph_i = -1)
 {
-    //Searching for a sphere :
-    float y = (screen_w/screen_pxl_w) * (pxl_y+0.5) - screen_w/2;
-    float z = (screen_h/screen_pxl_h) * (pxl_z+0.5) - screen_h/2;
-    Ray ray(Point(-20, 0, 0), Point(screen_x, y, z));
-
+    //Returns the index of the closest intersected sphere
     Point inter;
     Point close_inter;
     float min_dist;
@@ -141,33 +174,85 @@ void trace_ray(int pxl_y, int pxl_z)
 
     for (int i = 0; i < nb_spheres; i++)
     {
+        if (i == prev_sph_i)
+            continue;
+        
         nb_inter = ray.intersect(spheres[i], &inter, &dist);
-        if (nb_inter != 0)
+        if (nb_inter == 0)
+            continue;
+        
+        if ((min_i == -1 || dist < min_dist) && dist > 0)
         {
-            if (min_i == -1 || dist < min_dist)
-            {
-                min_dist = dist;
-                min_i = i;
-                close_inter = inter;
-            }
+            min_dist = dist;
+            min_i = i;
+            close_inter = inter;
         }
-    }
-    
-    if (min_i == -1)
-    {
-        // render.setPixel(y, z, bg_color);
-        return;
     }
 
+    if (min_i != -1)
+        *intersection = close_inter;
+    return min_i;
+}
+
+Color diffuse(int sphere_i, Point& P)
+{
     Color pxl_col(0, 0, 0);
+
     for (int j = 0; j < nb_sources; j++)
     {
-        if (is_visible(min_i, close_inter, sources[j]))
-        {
-            // std::cout << "diffuse color of source" << std::endl;
-            pxl_col += spheres[min_i].diffuse(close_inter, sources[j]);
-        }
+        if (is_visible(sphere_i, P, sources[j]))
+            pxl_col += spheres[sphere_i].diffuse(P, sources[j]);
     }
+
+    return pxl_col;
+}
+
+Color reflect(Ray& ray, int reflect_no = 0, int prev_sph_i = -1)
+{
+    //Searching the first sphere intersected by the ray :
+    Point P;
+    int sphere_i = intersect(ray, &P, prev_sph_i);
+
+    //No sphere intersected :
+    if (sphere_i == -1)
+    {
+        if (reflect_no > 0) //one type of end case : reflection goes to bg
+            return Color(0, 0, 0);
+        else    //camera ray goes straight to background
+            return bg_color;
+    }
+
+    //Diffusing the color of the intersected sphere :
+    Color color = diffuse(sphere_i, P);
+    
+    if (reflect_no == max_reflect || spheres[sphere_i].get_Kr() == 0)
+    //the other end case : max reflection reached or the sphere is not reflective
+        return color;
+
+    //Computing the reflected ray :
+    Vect N = Vect(spheres[sphere_i].get_center(), P).normalize();
+    Vect plan_dir = (N ^ (N ^ ray.get_dir()) ).normalize();
+    Vect w = plan_dir * (ray.get_dir() * plan_dir * 2) - ray.get_dir();
+    Ray reflected(P, w);
+
+    Color ref_col = reflect(reflected, reflect_no+1, sphere_i);
+
+    color +=  ref_col * spheres[sphere_i].get_Kr();
+    return color;
+}
+
+void trace_ray(int pxl_y, int pxl_z)
+{
+    //Creating camera ray :
+    float y = (screen_w/screen_pxl_w) * (pxl_y+0.5) - screen_w/2;
+    float z = (screen_h/screen_pxl_h) * (pxl_z+0.5) - screen_h/2;
+    Ray ray(Point(-20, 0, 0), Point(screen_x, y, z));
+
+    //Processing color :
+    Color pxl_col = reflect(ray);
+    
+    if (pxl_col == bg_color)
+        return; //no need to draw bg_color on bg_color
 
     render.setPixel(pxl_y, pxl_z, sf::Color(pxl_col.r, pxl_col.g, pxl_col.b));
     return;
@@ -179,7 +264,7 @@ int main()
 
     read_settings();
 
-    render.create(screen_pxl_w, screen_pxl_h, bg_color);
+    render.create(screen_pxl_w, screen_pxl_h, sf_bg_color);
     sf::RenderWindow window(sf::VideoMode(screen_pxl_w, screen_pxl_h), "");
     window.setSize(sf::Vector2u(screen_pxl_w, screen_pxl_h));
 
@@ -191,8 +276,9 @@ int main()
             trace_ray(y, z);
         }
     }
+    t0 = clock.getElapsedTime().asMilliseconds() - t0;
     std::cout << "end of render" << std::endl;
-    std::cout << "render duration : " << clock.getElapsedTime().asMilliseconds()-t0 << "ms" << std::endl;
+    std::cout << "render duration : " << t0 << "ms" << std::endl;
 
     sf::Texture texture;
     texture.loadFromImage(render);

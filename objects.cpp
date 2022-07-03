@@ -27,14 +27,6 @@ Point::Point() {}
 
 Point::Point(float x, float y, float z) : x(x), y(y), z(z) {}
 
-ostream& operator<<(ostream& os, const Point& p)
-{
-    os << "(" << p.x;
-    os << ", " << p.y;
-    os << ", " << p.z << ")";
-    return os;
-}
-
 
 // Methods for Vect class
 
@@ -44,17 +36,17 @@ Vect::Vect(float x, float y, float z) : x(x), y(y), z(z) {}
 
 Vect::Vect(Point A, Point B) : x(B.x-A.x), y(B.y-A.y), z(B.z-A.z) {}
 
-float Vect::operator*(Vect other)
+float Vect::operator*(const Vect& other)
 {
     return this->x * other.x + this->y * other.y + this->z * other.z;
 }
 
-Vect Vect::operator*(float t)
+Vect Vect::operator*(const float& k)
 {
-    return Vect(this->x*t, this->y*t, this->z*t);
+    return Vect(this->x*k, this->y*k, this->z*k);
 }
 
-Vect Vect::operator^(Vect other)
+Vect Vect::operator^(const Vect& other)
 {
     float new_x = this->y * other.z - this->z * other.y;
     float new_y = this->z * other.x - this->x * other.z;
@@ -62,9 +54,14 @@ Vect Vect::operator^(Vect other)
     return Vect(new_x, new_y, new_z);
 }
 
-Point Vect::operator+(Point origin)
+Point Vect::operator+(const Point& origin)
 {
     return Point(x+origin.x, y+origin.y, z+origin.z);
+}
+
+Vect Vect::operator-(const Vect& other)
+{
+    return Vect(x-other.x, y-other.y, z-other.z);
 }
 
 float Vect::get_norm()
@@ -96,6 +93,11 @@ Ray::Ray(Point A, Point B) : origin(A), direction(Vect(A, B).normalize()) {}
 Point Ray::get_point(float d)
 {
     return direction * d + origin;
+}
+
+Vect Ray::get_dir()
+{
+    return direction;
 }
 
 int Ray::intersect(Sphere sphere, Point* first_inter, float* dist)
@@ -163,14 +165,19 @@ Color Color::operator*(const Diff_coef& diff_coef)
     return result;
 }
 
-ostream& operator<<(ostream& os, const Color& col)
+Color Color::operator*(const float& Kr)
 {
-    os << "(" << +col.r;
-    os << ", " << +col.g;
-    os << ", " << +col.b << ")";
-    return os;
+    Color result;
+    result.r = uint8_t(float(r)*Kr);
+    result.g = uint8_t(float(g)*Kr);
+    result.b = uint8_t(float(b)*Kr);
+    return result;
 }
 
+bool Color::operator==(const Color& other)
+{
+    return (r==other.r && g==other.g && b==other.b);
+}
 
 // Methods for Diff_coef struct
 
@@ -204,7 +211,8 @@ Source::Source(Point S, Color C) : S(S), C(C) {}
 
 Sphere::Sphere() {}
 
-Sphere::Sphere(Point center, float radius, Diff_coef Kd) : center(center), radius(radius), Kd(Kd) {}
+Sphere::Sphere(Point center, float radius, Diff_coef Kd, float Kr) :
+center(center), radius(radius), Kd(Kd), Kr(Kr) {}
 
 Sphere::Sphere(Point A, Point B) : center(A)
 {
@@ -219,6 +227,11 @@ Point Sphere::get_center()
 float Sphere::get_radius()
 {
     return radius;
+}
+
+float Sphere::get_Kr()
+{
+    return Kr;
 }
 
 bool Sphere::above_h(Point P, Source S)

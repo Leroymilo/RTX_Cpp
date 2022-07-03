@@ -25,13 +25,16 @@ class Vect
         Vect();
         Vect(float x, float y, float z);
         Vect(Point A, Point B);
-        float operator*(Vect other);
-        Vect operator*(float t);
-        Vect operator^(Vect other);
-        Point operator+(Point origin);
+        float operator*(const Vect& other);
+        Vect operator*(const float& k);
+        Vect operator^(const Vect& other);
+        Point operator+(const Point& origin);
+        Vect operator-(const Vect& other);
 
         float get_norm();
         Vect normalize();
+
+        friend std::ostream& operator<<(std::ostream&, const Vect&);
 };
 
 struct Diff_coef    //Diffusion coefficient for spheres
@@ -53,6 +56,8 @@ struct Color
     Color(uint8_t r, uint8_t g, uint8_t b);
     Color& operator+=(const Color& other);
     Color operator*(const Diff_coef& Kd);
+    Color operator*(const float& Kr);
+    bool operator==(const Color& other);
 };
 
 struct Source    //light source
@@ -69,14 +74,16 @@ class Sphere
         Point center;
         float radius;
         Diff_coef Kd;   //diffusion coefficient
+        float Kr;       //reflection coefficient
     
     public :
         Sphere();
-        Sphere(Point center, float radius, Diff_coef Kd);
+        Sphere(Point center, float radius, Diff_coef Kd, float Kr);
         Sphere(Point A, Point B);
 
         Point get_center();
         float get_radius();
+        float get_Kr();
         bool above_h(Point P, Source S);
         Color diffuse(Point P, Source S);
 };
@@ -92,6 +99,7 @@ class Ray
         Ray(Point origin, Vect direction);
         Ray(Point A, Point B);
 
+        Vect get_dir();
         Point get_point(float dist_from_origin);
         int intersect(Sphere sphere, Point* first_inter, float* dist_from_o);
 };
