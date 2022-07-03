@@ -1,19 +1,99 @@
 #include "objects.hpp"
+
+#include <json/value.h>
+#include <json/json.h>
+#include <fstream>
+
 #include <SFML/Graphics.hpp>
 
-int nb_spheres = 1;
+int nb_spheres;
 std::vector<Sphere> spheres;
-int nb_sources = 3;
+int nb_sources;
 std::vector<Source> sources;
 
-float screen_x = 20;
-float screen_w = 90;
-float screen_h = 50;
-unsigned int screen_pxl_w = 1800;
-unsigned int screen_pxl_h = 1000;
+float screen_x;
+float screen_w;
+float screen_h;
+unsigned int screen_pxl_w;
+unsigned int screen_pxl_h;
 
+Point camera_pos;
 sf::Image render;
-sf::Color bg_color(0, 0, 150);
+sf::Color bg_color;
+
+void read_settings()
+{
+    std::ifstream file("settings/settings.json");
+    Json::Value actualJson;
+    Json::Reader reader;
+
+    //Parsing general settings :
+    reader.parse(file, actualJson);
+
+    screen_x = actualJson["screen_virt_x"].asFloat();
+    screen_w = actualJson["screen_virt_w"].asFloat();
+    screen_h = actualJson["screen_virt_h"].asFloat();
+    screen_pxl_w = actualJson["screen_pxl_w"].asInt();
+    screen_pxl_h = actualJson["screen_pxl_h"].asInt();
+
+    camera_pos = Point(
+        actualJson["camera_virt_pos"]["x"].asFloat(),
+        actualJson["camera_virt_pos"]["y"].asFloat(),
+        actualJson["camera_virt_pos"]["z"].asFloat()
+    );
+
+    bg_color = sf::Color(
+        actualJson["background_color"]["r"].asInt(),
+        actualJson["background_color"]["g"].asInt(),
+        actualJson["background_color"]["b"].asInt()
+    );
+
+    //Parsing spheres :
+    file = std::ifstream("settings/spheres.json");
+    reader.parse(file, actualJson);
+
+    nb_spheres = actualJson["nb_spheres"].asInt();
+
+    for (int i = 0; i < nb_spheres; i++)
+    {
+        Point center(
+            actualJson["spheres"][i]["x"].asFloat(),
+            actualJson["spheres"][i]["y"].asFloat(),
+            actualJson["spheres"][i]["z"].asFloat()
+        );
+        float radius = actualJson["spheres"][i]["radius"].asInt();
+        Diff_coef color(
+            actualJson["spheres"][i]["r"].asFloat(),
+            actualJson["spheres"][i]["g"].asFloat(),
+            actualJson["spheres"][i]["b"].asFloat()
+        );
+
+        spheres.push_back(Sphere(center, radius, color));
+    }
+
+    //Parsing light sources :
+    file = std::ifstream("settings/sources.json");
+    reader.parse(file, actualJson);
+
+    nb_sources = actualJson["nb_sources"].asInt();
+
+    for (int i = 0; i < nb_sources; i++)
+    {
+        Point position(
+            actualJson["sources"][i]["x"].asFloat(),
+            actualJson["sources"][i]["y"].asFloat(),
+            actualJson["sources"][i]["z"].asFloat()
+        );
+        Color color(
+            actualJson["sources"][i]["r"].asInt(),
+            actualJson["sources"][i]["g"].asInt(),
+            actualJson["sources"][i]["b"].asInt()
+        );
+
+        sources.push_back(Source(position, color));
+    }
+
+}
 
 bool is_visible(int sphere_i, Point P, Source S)
 {
@@ -97,14 +177,11 @@ int main()
 {
     sf::Clock clock;
 
+    read_settings();
+
     render.create(screen_pxl_w, screen_pxl_h, bg_color);
     sf::RenderWindow window(sf::VideoMode(screen_pxl_w, screen_pxl_h), "");
     window.setSize(sf::Vector2u(screen_pxl_w, screen_pxl_h));
-
-    spheres.push_back(Sphere(Point(20, 0, 0), 5));
-    sources.push_back(Source(Point(0, 0, 10), Color(255, 0, 0)));
-    sources.push_back(Source(Point(0, 8.66, -5), Color(0, 255, 0)));
-    sources.push_back(Source(Point(0, -8.66, -5), Color(0, 0, 255)));
 
     int t0 = clock.getElapsedTime().asMilliseconds();
     for (int y = 0; y < screen_pxl_w; y++)

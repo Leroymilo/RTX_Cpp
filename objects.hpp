@@ -34,6 +34,16 @@ class Vect
         Vect normalize();
 };
 
+struct Diff_coef    //Diffusion coefficient for spheres
+{
+    float r = 1;
+    float g = 1;
+    float b = 1;
+    Diff_coef();
+    Diff_coef(float r, float g, float b);
+    Diff_coef operator*(const float& k);
+};
+
 struct Color
 {
     uint8_t r = 255;
@@ -42,6 +52,7 @@ struct Color
     Color();
     Color(uint8_t r, uint8_t g, uint8_t b);
     Color& operator+=(const Color& other);
+    Color operator*(const Diff_coef& Kd);
 };
 
 struct Source    //light source
@@ -57,11 +68,11 @@ class Sphere
     private :
         Point center;
         float radius;
-        Color Kd;   //diffusion coefficient
+        Diff_coef Kd;   //diffusion coefficient
     
     public :
         Sphere();
-        Sphere(Point center, float radius);
+        Sphere(Point center, float radius, Diff_coef Kd);
         Sphere(Point A, Point B);
 
         Point get_center();

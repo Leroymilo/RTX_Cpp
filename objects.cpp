@@ -154,12 +154,42 @@ Color& Color::operator+=(const Color& other)
     return *this;
 }
 
+Color Color::operator*(const Diff_coef& diff_coef)
+{
+    Color result;
+    result.r = uint8_t(float(r)*diff_coef.r);
+    result.g = uint8_t(float(g)*diff_coef.g);
+    result.b = uint8_t(float(b)*diff_coef.b);
+    return result;
+}
+
 ostream& operator<<(ostream& os, const Color& col)
 {
     os << "(" << +col.r;
     os << ", " << +col.g;
     os << ", " << +col.b << ")";
     return os;
+}
+
+
+// Methods for Diff_coef struct
+
+Diff_coef::Diff_coef() {}
+
+Diff_coef::Diff_coef(float r, float g, float b)
+{
+    this->r = max(0.F, min(1.F, r));
+    this->g = max(0.F, min(1.F, g));
+    this->b = max(0.F, min(1.F, b));
+}
+
+Diff_coef Diff_coef::operator*(const float& k)
+{
+    Diff_coef result;
+    result.r = max(0.F, min(1.F, r*k));
+    result.g = max(0.F, min(1.F, g*k));
+    result.b = max(0.F, min(1.F, b*k));
+    return result;
 }
 
 
@@ -174,7 +204,7 @@ Source::Source(Point S, Color C) : S(S), C(C) {}
 
 Sphere::Sphere() {}
 
-Sphere::Sphere(Point center, float radius) : center(center), radius(radius) {}
+Sphere::Sphere(Point center, float radius, Diff_coef Kd) : center(center), radius(radius), Kd(Kd) {}
 
 Sphere::Sphere(Point A, Point B) : center(A)
 {
@@ -208,11 +238,6 @@ Color Sphere::diffuse(Point P, Source S)
     Vect N = Vect(center, P).normalize();
     Vect u = Vect(P, S.S).normalize();
     float cos_th = N*u;
-    Color result;
 
-    result.r = uint8_t(float(Kd.r)*float(S.C.r)*cos_th/255);
-    result.g = uint8_t(float(Kd.g)*float(S.C.g)*cos_th/255);
-    result.b = uint8_t(float(Kd.b)*float(S.C.b)*cos_th/255);
-
-    return result;
+    return S.C*(Kd*cos_th);
 }
