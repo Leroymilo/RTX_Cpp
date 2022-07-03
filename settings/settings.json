@@ -1,0 +1,23 @@
+{
+    //Recommended dimensions.
+    //Virtual dimensions should be proportionnal to pixel dimensions.
+    "screen_pxl_w" : 1800,
+    "screen_pxl_h" : 1000,
+    "screen_virt_x" : 20,
+    "screen_virt_w" : 90,
+    "screen_virt_h" : 50,
+
+    "camera_virt_pos" :
+    {
+        "x" : -20,
+        "y" : 0,
+        "z" : 0
+    },
+
+    "background_color" :
+    {
+        "r" : 0,
+        "g" : 60,
+        "b" : 150
+    }
+}
