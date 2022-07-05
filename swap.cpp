@@ -97,8 +97,6 @@ void read_settings()
 
     max_reflect = actualJson["max_reflections"].asInt();
 
-    max_threads = actualJson["max_threads"].asLargestUInt();
-
     //Parsing spheres :
     file = std::ifstream("settings/spheres.json");
     reader.parse(file, actualJson);
@@ -292,6 +290,7 @@ int main()
     render.create(screen_pxl_w, screen_pxl_h, sf_bg_color);
 
     float t0 = sfclock.getElapsedTime().asSeconds();
+    max_threads = std::thread::hardware_concurrency();
 
     std::cout << "starting render" << std::endl;
     for (int z = 0; z < screen_pxl_h; z++)
