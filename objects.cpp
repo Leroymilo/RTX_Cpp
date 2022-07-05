@@ -2,6 +2,8 @@
 #include <cmath>
 #include <algorithm>
 
+#include <SFML/Graphics.hpp>
+
 using namespace std;
 
 // Fast inverse squareroot from https://youtu.be/p8u_k2LIZyo
