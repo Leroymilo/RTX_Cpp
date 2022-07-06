@@ -265,13 +265,13 @@ int main()
     std::cout << "starting render" << std::endl;
     for (int z = 0; z < screen_pxl_h; z++)
     {
-        // if (threads.size() >= max_threads)
-        // {
-        //     threads.front().join();
-        //     threads.pop_front();
-        // }
-        // threads.push_back(std::thread(draw_pxl_hline, z));
-        draw_pxl_hline(z);
+        if (threads.size() >= max_threads)
+        {
+            threads.front().join();
+            threads.pop_front();
+        }
+        threads.push_back(std::thread(draw_pxl_hline, z));
+        // draw_pxl_hline(z);
     }
 
     for (std::thread & t : threads)
