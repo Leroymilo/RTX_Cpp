@@ -1,0 +1,6 @@
+.vscode
+*.zip
+*.exe
+*.o
+*.dll
+src/**
