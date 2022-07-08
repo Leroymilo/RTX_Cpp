@@ -71,7 +71,7 @@ float Vect::get_norm()
 
 Vect Vect::normalize()
 {
-    float inv_norm = inv_sqrt((*this)*(*this));
+    float inv_norm = 1/std::sqrt((*this)*(*this));
     return Vect(this->x*inv_norm, this->y*inv_norm, this->z*inv_norm);
 }
 

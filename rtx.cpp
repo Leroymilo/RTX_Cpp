@@ -10,7 +10,7 @@
 // Variables declaration :
 
 int nb_spheres;
-std::vector<Sphere> spheres;
+std::vector<Sphere> spheres; 
 int nb_sources;
 std::vector<Source> sources;
 
@@ -214,9 +214,8 @@ sf::Color reflect(Ray& ray, int reflect_no = 0, int prev_sph_i = -1)
         return color;
 
     //Computing the reflected ray :
-    Vect N = Vect(spheres[sphere_i].get_center(), P);
-    Vect plan_dir = (N ^ (N ^ ray.get_dir()) ).normalize();
-    Vect w = plan_dir * (ray.get_dir() * plan_dir * 2) - ray.get_dir();
+    Vect N = Vect(spheres[sphere_i].get_center(), P)*(1/spheres[sphere_i].get_radius());
+    Vect w = ray.get_dir() - N * (ray.get_dir() * N * 2);
     Ray reflected(P, w);
 
     sf::Color ref_col = reflect(reflected, reflect_no+1, sphere_i);
@@ -238,8 +237,8 @@ void trace_ray(int pxl_y, int pxl_z)
     if (pxl_col == bg_color)
         return; //no need to draw bg_color on bg_color
 
-    render.setPixel(pxl_y, screen_pxl_h-pxl_z, pxl_col);
-    //The image need to be reversed somehow...
+    render.setPixel(screen_pxl_w-pxl_y-1, screen_pxl_h-pxl_z-1, pxl_col);
+    //The image need to be reversed since screen coordinates are starting from top left.
     
     return;
 }
@@ -247,7 +246,9 @@ void trace_ray(int pxl_y, int pxl_z)
 void draw_pxl_hline(int z)
 {
     for (int y = 0; y < screen_pxl_w; y++)
+    {
         trace_ray(y, z);
+    }    
 }
 
 

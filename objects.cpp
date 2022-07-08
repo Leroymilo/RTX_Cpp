@@ -46,7 +46,7 @@ sf::Color Sphere::diffuse(Point P, Source S)
     // Returns the color that would result from the diffusion of
     // light source S on the point P of the sphere.
 
-    Vect N = Vect(C, P).normalize();
+    Vect N = Vect(C, P)*(1/r);
     Vect u = Vect(P, S.O).normalize();
     float cos_th = N*u;
 
