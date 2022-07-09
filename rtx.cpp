@@ -271,7 +271,11 @@ sf::Color reflect(Ray& ray, const Intersection &prev_inter = Intersection(), int
     Ray reflected(inter.point, w);
 
     // Computing reflected color :
-    color +=  reflect(reflected, inter, reflect_no+1) * spheres[inter.obj_id].get_Kr();
+    if (inter.obj_type == 's')
+        color +=  reflect(reflected, inter, reflect_no+1) * spheres[inter.obj_id].get_Kr();
+    else
+        color +=  reflect(reflected, inter, reflect_no+1) * triangles[inter.obj_id].get_Kr();
+        
     return color;
 }
 
