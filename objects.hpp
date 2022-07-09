@@ -30,6 +30,27 @@ class Sphere
         sf::Color diffuse(Point P, Source S);
 };
 
+class Triangle
+{
+    private :
+        Point A, B, C;
+        Vect n;     //normal vector
+        float d;    //distance between the triangle's plane and the origin (0, 0, 0)
+        Diff_coef Kd;   //diffusion coefficient
+        float Kr;       //reflection coefficient
+
+    public :
+        Triangle();
+        Triangle(Point A, Point B, Point C, Diff_coef Kd, float Kr);
+
+        Vect get_n();
+        float get_d();
+        float get_Kr();
+
+        bool is_around(const Point& point);
+        sf::Color diffuse(Point P, Source S);
+};
+
 class Ray
 {
     private :
@@ -43,7 +64,8 @@ class Ray
 
         Vect get_dir();
         Point get_point(float dist_from_origin);
-        int intersect_sph(Sphere sphere, Point* first_inter, float* dist_from_o);
+        bool intersect_sph(Sphere* sphere, Intersection*);
+        bool intersect_tri(Triangle* triangle, Intersection*);
 };
 
 #endif //OBJECTS_H

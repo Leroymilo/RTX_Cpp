@@ -124,3 +124,8 @@ std::ostream& operator<<(std::ostream& os, sf::Color& col)
     os << ", " << +col.b << ")";
     return os;
 }
+
+
+// Methods for Intersection class
+
+Intersection::Intersection() {}

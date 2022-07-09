@@ -10,7 +10,9 @@
 // Variables declaration :
 
 int nb_spheres;
-std::vector<Sphere> spheres; 
+std::vector<Sphere> spheres;
+int nb_triangles;
+std::vector<Triangle> triangles; 
 int nb_sources;
 std::vector<Source> sources;
 
@@ -25,10 +27,8 @@ int max_reflect;
 Point camera_pos;
 sf::Image render;
 sf::Color bg_color;
-sf::Color sf_bg_color;
 
-std::list<std::thread> threads;
-unsigned long max_threads;
+bool multithreading;
 
 // time analyze variables :
 sf::Clock sfclock;
@@ -65,6 +65,8 @@ void read_settings()
 
     max_reflect = actualJson["max_reflections"].asInt();
 
+    multithreading = actualJson["multi_threading"].asBool();
+
     //Parsing spheres :
     file = std::ifstream("settings/spheres.json");
     reader.parse(file, actualJson);
@@ -73,20 +75,16 @@ void read_settings()
 
     for (int i = 0; i < nb_spheres; i++)
     {
-        Point center(
-            actualJson["spheres"][i]["x"].asFloat(),
-            actualJson["spheres"][i]["y"].asFloat(),
-            actualJson["spheres"][i]["z"].asFloat()
-        );
-        float radius = actualJson["spheres"][i]["radius"].asFloat();
-        Diff_coef color(
-            actualJson["spheres"][i]["r"].asFloat(),
-            actualJson["spheres"][i]["g"].asFloat(),
-            actualJson["spheres"][i]["b"].asFloat()
-        );
-        float Kr = actualJson["spheres"][i]["Kr"].asFloat();
-
-        spheres.push_back(Sphere(center, radius, color, Kr));
+        spheres.push_back(Sphere(
+            Point(actualJson["spheres"][i]["x"].asFloat(),
+                  actualJson["spheres"][i]["y"].asFloat(),
+                  actualJson["spheres"][i]["z"].asFloat()),
+            actualJson["spheres"][i]["radius"].asFloat(),
+            Diff_coef(actualJson["spheres"][i]["r"].asFloat(),
+                      actualJson["spheres"][i]["g"].asFloat(),
+                      actualJson["spheres"][i]["b"].asFloat()),
+            actualJson["spheres"][i]["Kr"].asFloat()
+        ));
     }
 
     //Parsing light sources :
@@ -97,108 +95,147 @@ void read_settings()
 
     for (int i = 0; i < nb_sources; i++)
     {
-        Point position(
-            actualJson["sources"][i]["x"].asFloat(),
-            actualJson["sources"][i]["y"].asFloat(),
-            actualJson["sources"][i]["z"].asFloat()
-        );
-        sf::Color color(
-            actualJson["sources"][i]["r"].asInt(),
-            actualJson["sources"][i]["g"].asInt(),
-            actualJson["sources"][i]["b"].asInt()
-        );
+        sources.push_back(Source(
+            Point(actualJson["sources"][i]["x"].asFloat(),
+                  actualJson["sources"][i]["y"].asFloat(),
+                  actualJson["sources"][i]["z"].asFloat()),
+            sf::Color(actualJson["sources"][i]["r"].asInt(),
+                      actualJson["sources"][i]["g"].asInt(),
+                      actualJson["sources"][i]["b"].asInt())
+        ));
+    }
 
-        sources.push_back(Source(position, color));
+    //Parsing triangles :
+    file = std::ifstream("settings/triangles.json");
+    reader.parse(file, actualJson);
+
+    nb_triangles = actualJson["nb_triangles"].asInt();
+
+    for (int i = 0; i < nb_triangles; i++)
+    {
+        triangles.push_back(Triangle(
+            Point(actualJson["triangles"][i]["A"]["x"].asFloat(),
+                  actualJson["triangles"][i]["A"]["y"].asFloat(),
+                  actualJson["triangles"][i]["A"]["z"].asFloat()),
+            Point(actualJson["triangles"][i]["B"]["x"].asFloat(),
+                  actualJson["triangles"][i]["B"]["y"].asFloat(),
+                  actualJson["triangles"][i]["B"]["z"].asFloat()),
+            Point(actualJson["triangles"][i]["C"]["x"].asFloat(),
+                  actualJson["triangles"][i]["C"]["y"].asFloat(),
+                  actualJson["triangles"][i]["C"]["z"].asFloat()),
+            Diff_coef(actualJson["triangles"][i]["r"].asFloat(),
+                      actualJson["triangles"][i]["g"].asFloat(),
+                      actualJson["triangles"][i]["b"].asFloat()),
+            actualJson["triangles"][i]["Kr"].asFloat()
+        ));
     }
 }
 
 
 //Maths functions :
 
-bool is_visible(int sphere_i, Point& P, Source& S)
+bool is_visible(const Intersection& inter, const Source& S)
 {
-    Sphere* sphere = &spheres[sphere_i];
+    Ray ray(inter.point, S.O);
+    Intersection _;    //dummy to fill unused parameter
 
-    if (!sphere->above_h(P, S))
+    if (inter.obj_type == 's')
     {
-        // std::cout << "source under point's horizon" << std::endl;
-        return false;
+        if (inter.side && !spheres[inter.obj_id].above_h(inter.point, S))
+            return false;
     }
-
-    Ray ray(P, S.O);
-    Point p;
-    float d;
+    else
+    {
+        if (inter.side != (ray.get_dir()*triangles[inter.obj_id].get_n() > 0))
+            return false;
+    }
 
     for (int i = 0; i < nb_spheres; i++)
     {
-        if (i == sphere_i)
+        if (inter.obj_type == 's' && i == inter.obj_id)
             continue;
-        
-        if (ray.intersect_sph(spheres[i], &p, &d) && d > 0)
-        {
-            // std::cout << "source obstructed by a sphere" << std::endl;
+
+        if (ray.intersect_sph(&spheres[i], &_))
             return false;
-        }
     }
 
-    // std::cout << "source visible" << std::endl;
+    for (int i = 0; i < nb_triangles; i++)
+    {
+        if (inter.obj_type == 't' && i == inter.obj_id)
+            continue;
+        
+        if (ray.intersect_tri(&triangles[i], &_))
+            return false;
+    }
+
     return true;
 }
 
-int intersect_all(Ray& ray, Point* intersection, bool* in_sphere, int prev_sph_i = -1)
+bool intersect_all(Ray& ray, Intersection* inter, const Intersection& prev_inter)
 {
-    //Returns the index of the closest intersected sphere
-    Point inter;
-    Point close_inter;
-    float min_dist;
-    float dist;
-    int nb_inter;
-    int min_i = -1;
+    // Returns true if an object is intersected.
+    // The data of the intersected object is passed through inter
+    Intersection temp_inter;
 
     for (int i = 0; i < nb_spheres; i++)
     {
-        if (i == prev_sph_i)
+        if (prev_inter.obj_type == 's' && prev_inter.obj_id == i)
             continue;
         
-        nb_inter = ray.intersect_sph(spheres[i], &inter, &dist);
-        if (nb_inter == 0)
+        if (!ray.intersect_sph(&spheres[i], &temp_inter))
             continue;
         
-        if ((min_i == -1 || dist < min_dist) && dist > 0)
+        if (inter->obj_id == -1 || temp_inter.dist < inter->dist)
         {
-            min_dist = dist;
-            min_i = i;
-            close_inter = inter;
+            *inter = temp_inter;
+            inter->obj_id = i;
+            inter->obj_type = 's';
         }
     }
 
-    if (min_i != -1)
-        *intersection = close_inter;
-    return min_i;
+    for (int i = 0; i < nb_triangles; i++)
+    {
+        if (prev_inter.obj_type == 't' && prev_inter.obj_id == i)
+            continue;
+        
+        if (!ray.intersect_tri(&triangles[i], &temp_inter))
+            continue;
+        
+        if (inter->obj_id == -1 || temp_inter.dist < inter->dist)
+        {
+            *inter = temp_inter;
+            inter->obj_id = i;
+            inter->obj_type = 't';
+        }
+    }
+
+    return inter->obj_id != -1;
 }
 
-sf::Color diffuse(int sphere_i, Point& P)
+sf::Color diffuse(const Intersection& inter)
 {
     sf::Color pxl_col(0, 0, 0);
 
     for (int j = 0; j < nb_sources; j++)
     {
-        if (is_visible(sphere_i, P, sources[j]))
-            pxl_col += spheres[sphere_i].diffuse(P, sources[j]);
+        if (is_visible(inter, sources[j]))
+        {
+            if (inter.obj_type == 's')
+                pxl_col += spheres[inter.obj_id].diffuse(inter.point, sources[j]);
+            else
+                pxl_col += triangles[inter.obj_id].diffuse(inter.point, sources[j]);
+        }
     }
 
     return pxl_col;
 }
 
-sf::Color reflect(Ray& ray, int reflect_no = 0, int prev_sph_i = -1)
+sf::Color reflect(Ray& ray, const Intersection &prev_inter = Intersection(), int reflect_no = 0)
 {
     //Searching the first sphere intersected by the ray :
-    Point P;
-    bool in_sphere;
-    int sphere_i = intersect_all(ray, &P, &in_sphere, prev_sph_i);
+    Intersection inter;
 
-    //No sphere intersected :
-    if (sphere_i == -1)
+    if (!intersect_all(ray, &inter, prev_inter))
     {
         if (reflect_no > 0) //one type of end case : reflection goes to bg
             return sf::Color(0, 0, 0);
@@ -206,21 +243,35 @@ sf::Color reflect(Ray& ray, int reflect_no = 0, int prev_sph_i = -1)
             return bg_color;
     }
 
-    //Diffusing the color of the intersected sphere :
-    sf::Color color = diffuse(sphere_i, P);
-    
-    if (reflect_no == max_reflect || spheres[sphere_i].get_Kr() == 0)
-    //the other end case : max reflection reached or the sphere is not reflective
+    // Diffusing the color of the intersected object :
+    sf::Color color = diffuse(inter);
+
+    if (reflect_no == max_reflect)  // Max reflection reached
         return color;
+    
+    // If the object is not reflective :
+    if (inter.obj_type == 's')
+    {
+        if (spheres[inter.obj_id].get_Kr() == 0)
+            return color;
+    }
+    else
+    {
+        if (triangles[inter.obj_id].get_Kr() == 0)
+            return color;
+    }
 
     //Computing the reflected ray :
-    Vect N = Vect(spheres[sphere_i].get_center(), P)*(1/spheres[sphere_i].get_radius());
+    Vect N;
+    if (inter.obj_type == 's')
+        N = Vect(spheres[inter.obj_id].get_center(), inter.point)*(1/spheres[inter.obj_id].get_radius());
+    else
+        N = triangles[inter.obj_id].get_n();
     Vect w = ray.get_dir() - N * (ray.get_dir() * N * 2);
-    Ray reflected(P, w);
+    Ray reflected(inter.point, w);
 
-    sf::Color ref_col = reflect(reflected, reflect_no+1, sphere_i);
-
-    color +=  ref_col * spheres[sphere_i].get_Kr();
+    // Computing reflected color :
+    color +=  reflect(reflected, inter, reflect_no+1) * spheres[inter.obj_id].get_Kr();
     return color;
 }
 
@@ -259,26 +310,38 @@ int main()
 {
     read_settings();
 
-    render.create(screen_pxl_w, screen_pxl_h, sf_bg_color);
+    render.create(screen_pxl_w, screen_pxl_h, bg_color);
 
     float t0 = sfclock.getElapsedTime().asSeconds();
-    max_threads = std::thread::hardware_concurrency();
 
     std::cout << "starting render" << std::endl;
-    for (int z = 0; z < screen_pxl_h; z++)
+    if (multithreading)
     {
-        // if (threads.size() >= max_threads)
-        // {
-        //     threads.front().join();
-        //     threads.pop_front();
-        // }
-        // threads.push_back(std::thread(draw_pxl_hline, z));
-        draw_pxl_hline(z);
-    }
+        std::cout << "multithreading" << std::endl;
+        int max_threads = std::thread::hardware_concurrency();
+        std::list<std::thread> threads;
 
-    for (std::thread & t : threads)
+        for (int z = 0; z < screen_pxl_h; z++)
+        {
+            if (threads.size() >= max_threads)
+            {
+                threads.front().join();
+                threads.pop_front();
+            }
+            threads.push_back(std::thread(draw_pxl_hline, z));
+        }
+
+        for (std::thread & t : threads)
+        {
+            t.join();
+        }
+    }
+    else
     {
-        t.join();
+        for (int z = 0; z < screen_pxl_h; z++)
+        {
+            draw_pxl_hline(z);
+        }
     }
 
     t0 = sfclock.getElapsedTime().asSeconds() - t0;
