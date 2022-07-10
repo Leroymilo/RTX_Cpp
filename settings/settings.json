@@ -6,14 +6,14 @@
     "screen_virt_w" : 40,
     "screen_virt_h" : 23,
 
-    "dist_origin_screen" : 40,
-    "dist_origin_cam" : 80,
-    "cam_rotation" : 0,
-    "cam_azimut" : 0,
+    "dist_origin_screen" : 80,
+    "dist_origin_cam" : 100,
+    "cam_rotation" : 45,
+    "cam_azimut" : 20,
 
     "background_color" : {"r" : 20, "g" : 20, "b" : 20},
 
-    "max_reflections" : 1,
+    "max_reflections" : 5,
 
     "multi_threading" : true
 }
