@@ -48,7 +48,7 @@ sf::Color Sphere::diffuse(Point P, Source S)
 
     Vect N = Vect(C, P)*(1/r);
     Vect u = Vect(P, S.O).normalize();
-    float cos_th = N*u;
+    float cos_th = fabs(N*u);
 
     return S.col*(Kd*cos_th);
 }
@@ -83,9 +83,9 @@ float Triangle::get_Kr()
 // https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution
 bool Triangle::is_around(const Point& P)
 {
-    return (n*(Vect(A, B)^Vect(A, P)) > 0 &&
-    n*(Vect(B, C)^Vect(B, P)) > 0 &&
-    n*(Vect(C, A)^Vect(C, P)) > 0);
+    return (n*(Vect(A, B)^Vect(A, P)) >= 0 &&
+    n*(Vect(B, C)^Vect(B, P)) >= 0 &&
+    n*(Vect(C, A)^Vect(C, P)) >= 0);
 }
 
 sf::Color Triangle::diffuse(Point P, Source S)

@@ -1,7 +1,6 @@
 .vscode
-*.zip
 *.exe
 *.o
 renders
-!src
+archives
 !src/**

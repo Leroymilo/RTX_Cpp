@@ -6,55 +6,72 @@
 #include <list>
 #include <thread>
 #include <fstream>
+#include <cmath>
+
+using namespace std;
 
 // Variables declaration :
 
 int nb_spheres;
-std::vector<Sphere> spheres;
+vector<Sphere> spheres;
 int nb_triangles;
-std::vector<Triangle> triangles; 
+vector<Triangle> triangles; 
 int nb_sources;
-std::vector<Source> sources;
+vector<Source> sources;
 
-float screen_x;
 float screen_w;
 float screen_h;
 unsigned int screen_pxl_w;
 unsigned int screen_pxl_h;
+Point screen_pos;
+
+float rot;
+float azi;
+Point camera_pos;
+
+constexpr double pi() { return atan(1)*4; }
 
 int max_reflect;
 
-Point camera_pos;
-sf::Image render;
+sf::Image image;
 sf::Color bg_color;
 
 bool multithreading;
 
 // time analyze variables :
 sf::Clock sfclock;
+float t0;
 
 
 // Reading jsons :
 
 void read_settings()
 {
-    std::ifstream file("settings/settings.json");
+    ifstream file("settings/settings.json");
     Json::Value actualJson;
     Json::Reader reader;
 
     //Parsing general settings :
     reader.parse(file, actualJson);
 
-    screen_x = actualJson["screen_virt_x"].asFloat();
     screen_w = actualJson["screen_virt_w"].asFloat();
     screen_h = actualJson["screen_virt_h"].asFloat();
     screen_pxl_w = actualJson["screen_pxl_w"].asInt();
     screen_pxl_h = actualJson["screen_pxl_h"].asInt();
 
+    float screen_r = actualJson["dist_origin_screen"].asFloat();
+    float cam_r = actualJson["dist_origin_cam"].asFloat();
+    rot = actualJson["cam_rotation"].asFloat()*pi()/180;
+    azi = actualJson["cam_azimut"].asFloat()*pi()/180;
     camera_pos = Point(
-        actualJson["camera_virt_pos"]["x"].asFloat(),
-        actualJson["camera_virt_pos"]["y"].asFloat(),
-        actualJson["camera_virt_pos"]["z"].asFloat()
+        cos(azi)*cos(rot)*cam_r,
+        cos(azi)*sin(rot)*cam_r,
+        sin(azi)*cam_r
+    );
+    screen_pos = Point(
+        cos(azi)*cos(rot)*screen_r,
+        cos(azi)*sin(rot)*screen_r,
+        sin(azi)*screen_r
     );
 
     bg_color = sf::Color(
@@ -68,7 +85,7 @@ void read_settings()
     multithreading = actualJson["multi_threading"].asBool();
 
     //Parsing spheres :
-    file = std::ifstream("settings/spheres.json");
+    file = ifstream("settings/spheres.json");
     reader.parse(file, actualJson);
 
     nb_spheres = actualJson["nb_spheres"].asInt();
@@ -88,7 +105,7 @@ void read_settings()
     }
 
     //Parsing light sources :
-    file = std::ifstream("settings/sources.json");
+    file = ifstream("settings/sources.json");
     reader.parse(file, actualJson);
 
     nb_sources = actualJson["nb_sources"].asInt();
@@ -106,7 +123,7 @@ void read_settings()
     }
 
     //Parsing triangles :
-    file = std::ifstream("settings/triangles.json");
+    file = ifstream("settings/triangles.json");
     reader.parse(file, actualJson);
 
     nb_triangles = actualJson["nb_triangles"].asInt();
@@ -134,10 +151,22 @@ void read_settings()
 
 //Maths functions :
 
+Point get_screen_point(int pxl_x, int pxl_y)
+{
+    float screen_x = (screen_w/screen_pxl_w) * (pxl_x+0.5) - screen_w/2;
+    float screen_y = (screen_h/screen_pxl_h) * (pxl_y+0.5) - screen_h/2;
+    float x = screen_pos.x + sin(rot)*screen_x - sin(azi)*cos(rot)*screen_y;
+    float y = screen_pos.y - cos(rot)*screen_x - sin(azi)*sin(rot)*screen_y;
+    float z = screen_pos.z + cos(azi)*screen_y;
+    // I hate space projections
+    return Point(x, y, z);
+}
+
 bool is_visible(const Intersection& inter, const Source& S)
 {
     Ray ray(inter.point, S.O);
-    Intersection _;    //dummy to fill unused parameter
+    float dist = Vect(inter.point, S.O).get_norm();
+    Intersection temp_inter;
 
     if (inter.obj_type == 's')
     {
@@ -155,7 +184,7 @@ bool is_visible(const Intersection& inter, const Source& S)
         if (inter.obj_type == 's' && i == inter.obj_id)
             continue;
 
-        if (ray.intersect_sph(&spheres[i], &_))
+        if (ray.intersect_sph(&spheres[i], &temp_inter) && temp_inter.dist < dist)
             return false;
     }
 
@@ -164,7 +193,7 @@ bool is_visible(const Intersection& inter, const Source& S)
         if (inter.obj_type == 't' && i == inter.obj_id)
             continue;
         
-        if (ray.intersect_tri(&triangles[i], &_))
+        if (ray.intersect_tri(&triangles[i], &temp_inter) && temp_inter.dist < dist)
             return false;
     }
 
@@ -279,12 +308,10 @@ sf::Color reflect(Ray& ray, const Intersection &prev_inter = Intersection(), int
     return color;
 }
 
-void trace_ray(int pxl_y, int pxl_z)
+void trace_ray(int pxl_x, int pxl_y)
 {
     //Creating camera ray :
-    float y = (screen_w/screen_pxl_w) * (pxl_y+0.5) - screen_w/2;
-    float z = (screen_h/screen_pxl_h) * (pxl_z+0.5) - screen_h/2;
-    Ray ray(camera_pos, Point(screen_x, y, z));
+    Ray ray(camera_pos, get_screen_point(pxl_x, pxl_y));
 
     //Processing color :
     sf::Color pxl_col = reflect(ray);
@@ -292,50 +319,42 @@ void trace_ray(int pxl_y, int pxl_z)
     if (pxl_col == bg_color)
         return; //no need to draw bg_color on bg_color
 
-    render.setPixel(screen_pxl_w-pxl_y-1, screen_pxl_h-pxl_z-1, pxl_col);
+    image.setPixel(screen_pxl_w-pxl_x-1, screen_pxl_h-pxl_y-1, pxl_col);
     //The image need to be reversed since screen coordinates are starting from top left.
     
     return;
 }
 
-void draw_pxl_hline(int z)
+void draw_pxl_hline(int y)
 {
-    for (int y = 0; y < screen_pxl_w; y++)
+    for (int x = 0; x < screen_pxl_w; x++)
     {
-        trace_ray(y, z);
+        trace_ray(x, y);
     }    
 }
 
-
-//===========================================================================================================================================//
-// Well... main... :
-
-int main()
+void render()
 {
-    read_settings();
+    t0 = sfclock.getElapsedTime().asSeconds();
 
-    render.create(screen_pxl_w, screen_pxl_h, bg_color);
-
-    float t0 = sfclock.getElapsedTime().asSeconds();
-
-    std::cout << "starting render" << std::endl;
+    cout << "starting render" << endl;
     if (multithreading)
     {
-        std::cout << "multithreading" << std::endl;
-        int max_threads = std::thread::hardware_concurrency();
-        std::list<std::thread> threads;
+        cout << "multithreading" << endl;
+        int max_threads = thread::hardware_concurrency();
+        list<thread> threads;
 
-        for (int z = 0; z < screen_pxl_h; z++)
+        for (int y = 0; y < screen_pxl_h; y++)
         {
             if (threads.size() >= max_threads)
             {
                 threads.front().join();
                 threads.pop_front();
             }
-            threads.push_back(std::thread(draw_pxl_hline, z));
+            threads.push_back(thread(draw_pxl_hline, y));
         }
 
-        for (std::thread & t : threads)
+        for (thread & t : threads)
         {
             t.join();
         }
@@ -349,8 +368,21 @@ int main()
     }
 
     t0 = sfclock.getElapsedTime().asSeconds() - t0;
-    std::cout << "end of render" << std::endl;
-    std::cout << "render duration : " << t0 << "s" << std::endl;
+    cout << "end of render" << endl;
+    cout << "render duration : " << t0 << "s" << endl;
+}
+
+
+//===========================================================================================================================================//
+// Well... main... :
+
+int main()
+{
+    read_settings();
+
+    image.create(screen_pxl_w, screen_pxl_h, bg_color);
+
+    render();
 
     sf::RenderWindow window(sf::VideoMode(screen_pxl_w, screen_pxl_h), "");
     window.setSize(sf::Vector2u(screen_pxl_w, screen_pxl_h));
@@ -359,7 +391,7 @@ int main()
 
     t0 = sfclock.getElapsedTime().asSeconds();
 
-    texture.loadFromImage(render);
+    texture.loadFromImage(image);
 
     sprite.setTexture(texture);
 
@@ -367,7 +399,7 @@ int main()
     window.display();
     t0 = sfclock.getElapsedTime().asSeconds()- t0;
 
-    std::cout << "time to draw : " << t0 << "s" << std::endl;
+    cout << "time to draw : " << t0 << "s" << endl;
 
     
     while (window.isOpen())
