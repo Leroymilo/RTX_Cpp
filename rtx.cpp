@@ -340,9 +340,9 @@ void render()
     cout << "starting render" << endl;
     if (multithreading)
     {
-        cout << "multithreading" << endl;
         int max_threads = thread::hardware_concurrency();
         list<thread> threads;
+        cout << "multithreading on " << max_threads << " threads" << endl;
 
         for (int y = 0; y < screen_pxl_h; y++)
         {
