@@ -3,8 +3,8 @@
     //Virtual dimensions should be proportionnal to pixel dimensions.
     "screen_pxl_w" : 1600,
     "screen_pxl_h" : 920,
-    "screen_virt_w" : 40,
-    "screen_virt_h" : 23,
+    "screen_virt_w" : 80,
+    "screen_virt_h" : 46,
 
     "dist_origin_screen" : 80,
     "dist_origin_cam" : 100,
