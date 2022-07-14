@@ -13,7 +13,7 @@
 
     "background_color" : {"r" : 20, "g" : 20, "b" : 20},
 
-    "max_reflections" : 5,
+    "max_reflections" : 2,
 
     "multi_threading" : true
 }

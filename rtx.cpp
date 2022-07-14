@@ -7,8 +7,11 @@
 #include <thread>
 #include <fstream>
 #include <cmath>
+#include <filesystem>
 
 using namespace std;
+using namespace filesystem;
+
 
 // Variables declaration :
 
@@ -42,16 +45,27 @@ bool multithreading;
 sf::Clock sfclock;
 float t0;
 
+// files write time variables :
+file_time_type settings_t = last_write_time("settings/settings.json");
+file_time_type sources_t = last_write_time("settings/sources.json");
+file_time_type spheres_t = last_write_time("settings/spheres.json");
+file_time_type triangles_t = last_write_time("settings/triangles.json");
 
+// SFML variables :
+sf::RenderWindow window;
+sf::Texture texture;
+sf::Sprite sprite;
+
+
+//===========================================================================================================================================//
 // Reading jsons :
 
 void read_settings()
 {
+    //Parsing general settings :
     ifstream file("settings/settings.json");
     Json::Value actualJson;
     Json::Reader reader;
-
-    //Parsing general settings :
     reader.parse(file, actualJson);
 
     screen_w = actualJson["screen_virt_w"].asFloat();
@@ -83,10 +97,47 @@ void read_settings()
     max_reflect = actualJson["max_reflections"].asInt();
 
     multithreading = actualJson["multi_threading"].asBool();
+}
 
-    //Parsing spheres :
-    file = ifstream("settings/spheres.json");
+void resize()
+{
+    
+}
+
+void read_sources()
+{
+    //Parsing light sources :
+    ifstream file("settings/sources.json");
+    Json::Value actualJson;
+    Json::Reader reader;
     reader.parse(file, actualJson);
+
+    sources.clear();
+
+    nb_sources = actualJson["nb_sources"].asInt();
+
+    for (int i = 0; i < nb_sources; i++)
+    {
+        sources.push_back(Source(
+            Point(actualJson["sources"][i]["x"].asFloat(),
+                  actualJson["sources"][i]["y"].asFloat(),
+                  actualJson["sources"][i]["z"].asFloat()),
+            sf::Color(actualJson["sources"][i]["r"].asInt(),
+                      actualJson["sources"][i]["g"].asInt(),
+                      actualJson["sources"][i]["b"].asInt())
+        ));
+    }
+}
+
+void read_spheres()
+{
+    //Parsing spheres :
+    ifstream file("settings/spheres.json");
+    Json::Value actualJson;
+    Json::Reader reader;
+    reader.parse(file, actualJson);
+
+    spheres.clear();
 
     nb_spheres = actualJson["nb_spheres"].asInt();
 
@@ -103,28 +154,17 @@ void read_settings()
             actualJson["spheres"][i]["Kr"].asFloat()
         ));
     }
+}
 
-    //Parsing light sources :
-    file = ifstream("settings/sources.json");
-    reader.parse(file, actualJson);
-
-    nb_sources = actualJson["nb_sources"].asInt();
-
-    for (int i = 0; i < nb_sources; i++)
-    {
-        sources.push_back(Source(
-            Point(actualJson["sources"][i]["x"].asFloat(),
-                  actualJson["sources"][i]["y"].asFloat(),
-                  actualJson["sources"][i]["z"].asFloat()),
-            sf::Color(actualJson["sources"][i]["r"].asInt(),
-                      actualJson["sources"][i]["g"].asInt(),
-                      actualJson["sources"][i]["b"].asInt())
-        ));
-    }
-
+void read_triangles()
+{
     //Parsing triangles :
-    file = ifstream("settings/triangles.json");
+    ifstream file("settings/triangles.json");
+    Json::Value actualJson;
+    Json::Reader reader;
     reader.parse(file, actualJson);
+
+    triangles.clear();
 
     nb_triangles = actualJson["nb_triangles"].asInt();
 
@@ -148,8 +188,43 @@ void read_settings()
     }
 }
 
+bool update_settings()
+{
+    bool changed = false;
+    if (settings_t != last_write_time("settings/settings.json"))
+    {
+        read_settings();
+        settings_t = last_write_time("settings/settings.json");
+        changed = true;
+    }
 
-//Maths functions :
+    if (sources_t != last_write_time("settings/sources.json"))
+    {
+        read_sources();
+        sources_t = last_write_time("settings/sources.json");
+        changed = true;
+    }
+
+    if (spheres_t != last_write_time("settings/spheres.json"))
+    {
+        read_spheres();
+        spheres_t = last_write_time("settings/spheres.json");
+        changed = true;
+    }
+
+    if (triangles_t != last_write_time("settings/triangles.json"))
+    {
+        read_triangles();
+        triangles_t = last_write_time("settings/triangles.json");
+        changed = true;
+    }
+    cout << changed << endl;
+    return changed;
+}
+
+
+//===========================================================================================================================================//
+// Maths functions :
 
 Point get_screen_point(int pxl_x, int pxl_y)
 {
@@ -325,6 +400,10 @@ void trace_ray(int pxl_x, int pxl_y)
     return;
 }
 
+
+//===========================================================================================================================================//
+// General rendering and drawing procedures :
+
 void draw_pxl_hline(int y)
 {
     for (int x = 0; x < screen_pxl_w; x++)
@@ -372,6 +451,23 @@ void render()
     cout << "render duration : " << t0 << "s" << endl;
 }
 
+void draw()
+{
+    t0 = sfclock.getElapsedTime().asSeconds();
+
+    texture.loadFromImage(image);
+
+    sprite.setTexture(texture);
+
+    window.setSize(sf::Vector2u(screen_pxl_w, screen_pxl_h));
+    window.setView(sf::View(sf::FloatRect(0, 0, screen_pxl_w, screen_pxl_h)));
+    window.draw(sprite);
+    window.display();
+    t0 = sfclock.getElapsedTime().asSeconds()- t0;
+
+    cout << "time to draw : " << t0 << "s" << endl;
+}
+
 
 //===========================================================================================================================================//
 // Well... main... :
@@ -379,29 +475,15 @@ void render()
 int main()
 {
     read_settings();
+    read_spheres();
+    read_sources();
+    read_triangles();
 
+    window.create(sf::VideoMode(screen_pxl_w, screen_pxl_h), "RTX");
     image.create(screen_pxl_w, screen_pxl_h, bg_color);
-
     render();
+    draw();
 
-    sf::RenderWindow window(sf::VideoMode(screen_pxl_w, screen_pxl_h), "");
-    window.setSize(sf::Vector2u(screen_pxl_w, screen_pxl_h));
-    sf::Texture texture;
-    sf::Sprite sprite;
-
-    t0 = sfclock.getElapsedTime().asSeconds();
-
-    texture.loadFromImage(image);
-
-    sprite.setTexture(texture);
-
-    window.draw(sprite);
-    window.display();
-    t0 = sfclock.getElapsedTime().asSeconds()- t0;
-
-    cout << "time to draw : " << t0 << "s" << endl;
-
-    
     while (window.isOpen())
     {
         sf::Event evnt;
@@ -409,6 +491,20 @@ int main()
         {
             if (evnt.type == sf::Event::Closed)
                 window.close();
+            
+            else if (evnt.type == sf::Event::KeyPressed)
+            {
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Enter))
+                {
+                    if(update_settings())
+                    {
+                        image.create(screen_pxl_w, screen_pxl_h, bg_color);
+                        //I don't know why but putting this line in the render procedure won't work...
+                        render();
+                        draw();
+                    }
+                }
+            }
         }
     }
     return 0;
