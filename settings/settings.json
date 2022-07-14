@@ -1,10 +1,9 @@
 {
     //Recommended dimensions.
     //Virtual dimensions should be proportionnal to pixel dimensions.
-    "screen_pxl_w" : 1600,
-    "screen_pxl_h" : 920,
-    "screen_virt_w" : 80,
-    "screen_virt_h" : 46,
+    "screen_pxl_w" : 1200,
+    "screen_pxl_h" : 900,
+    "pxl/virt_ratio" : 0.05,
 
     "dist_origin_screen" : 80,
     "dist_origin_cam" : 100,

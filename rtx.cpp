@@ -2,6 +2,7 @@
 
 #include <json/value.h>
 #include <json/json.h>
+#include <json/writer.h>
 
 #include <list>
 #include <thread>
@@ -22,10 +23,11 @@ vector<Triangle> triangles;
 int nb_sources;
 vector<Source> sources;
 
-float screen_w;
-float screen_h;
 unsigned int screen_pxl_w;
 unsigned int screen_pxl_h;
+float virt_ratio;
+float screen_w;
+float screen_h;
 Point screen_pos;
 
 float rot;
@@ -53,8 +55,7 @@ file_time_type triangles_t = last_write_time("settings/triangles.json");
 
 // SFML variables :
 sf::RenderWindow window;
-sf::Texture texture;
-sf::Sprite sprite;
+bool fullscreen;
 
 
 //===========================================================================================================================================//
@@ -68,10 +69,22 @@ void read_settings()
     Json::Reader reader;
     reader.parse(file, actualJson);
 
-    screen_w = actualJson["screen_virt_w"].asFloat();
-    screen_h = actualJson["screen_virt_h"].asFloat();
     screen_pxl_w = actualJson["screen_pxl_w"].asInt();
     screen_pxl_h = actualJson["screen_pxl_h"].asInt();
+
+    sf::VideoMode vm = sf::VideoMode::getFullscreenModes()[0];
+    if (screen_pxl_w == -1 or screen_pxl_h == -1)
+    {
+        // I don't want to deal with only one dimension being maxed out
+        fullscreen = true;
+        screen_pxl_w = vm.width;
+        screen_pxl_h = vm.height;
+    }
+    else fullscreen = false;
+
+    virt_ratio = actualJson["pxl/virt_ratio"].asFloat();
+    screen_w = virt_ratio*screen_pxl_w;
+    screen_h = virt_ratio*screen_pxl_h;
 
     float screen_r = actualJson["dist_origin_screen"].asFloat();
     float cam_r = actualJson["dist_origin_cam"].asFloat();
@@ -101,7 +114,17 @@ void read_settings()
 
 void resize()
 {
-    
+    screen_pxl_w = window.getSize().x, screen_pxl_h = window.getSize().y;
+
+    sf::VideoMode vm = sf::VideoMode::getFullscreenModes()[0];
+    if (screen_pxl_w == vm.width)   // Not checking height because bar
+    {
+        fullscreen = true;
+        screen_pxl_h = vm.height;
+    }
+    else fullscreen = false;
+    screen_w = virt_ratio*screen_pxl_w;
+    screen_h = virt_ratio*screen_pxl_h;
 }
 
 void read_sources()
@@ -417,6 +440,8 @@ void render()
     t0 = sfclock.getElapsedTime().asSeconds();
 
     cout << "starting render" << endl;
+
+    image.create(screen_pxl_w, screen_pxl_h, bg_color);
     if (multithreading)
     {
         int max_threads = thread::hardware_concurrency();
@@ -438,6 +463,7 @@ void render()
             t.join();
         }
     }
+
     else
     {
         for (int z = 0; z < screen_pxl_h; z++)
@@ -455,17 +481,24 @@ void draw()
 {
     t0 = sfclock.getElapsedTime().asSeconds();
 
+    sf::Texture texture;
     texture.loadFromImage(image);
 
+    sf::Sprite sprite;
     sprite.setTexture(texture);
 
-    window.setSize(sf::Vector2u(screen_pxl_w, screen_pxl_h));
-    window.setView(sf::View(sf::FloatRect(0, 0, screen_pxl_w, screen_pxl_h)));
+    if (fullscreen)
+        window.create(sf::VideoMode::getFullscreenModes()[0], "RTX", sf::Style::Fullscreen);
+    else
+    {
+        window.setSize(sf::Vector2u(screen_pxl_w, screen_pxl_h));
+        window.setView(sf::View(sf::FloatRect(0, 0, screen_pxl_w, screen_pxl_h)));
+    }
     window.draw(sprite);
     window.display();
     t0 = sfclock.getElapsedTime().asSeconds()- t0;
 
-    cout << "time to draw : " << t0 << "s" << endl;
+    cout << "time to draw : " << t0 << "s\n\n";
 }
 
 
@@ -479,7 +512,10 @@ int main()
     read_sources();
     read_triangles();
 
-    window.create(sf::VideoMode(screen_pxl_w, screen_pxl_h), "RTX");
+    if (fullscreen)
+        window.create(sf::VideoMode::getFullscreenModes()[0], "RTX", sf::Style::Fullscreen);
+    else
+        window.create(sf::VideoMode(screen_pxl_w, screen_pxl_h), "RTX");
     image.create(screen_pxl_w, screen_pxl_h, bg_color);
     render();
     draw();
@@ -492,17 +528,30 @@ int main()
             if (evnt.type == sf::Event::Closed)
                 window.close();
             
+            else if (evnt.type == sf::Event::Resized)
+            {
+                resize();
+                render();
+                draw();
+            }
+
             else if (evnt.type == sf::Event::KeyPressed)
             {
                 if (sf::Keyboard::isKeyPressed(sf::Keyboard::Enter))
                 {
                     if(update_settings())
                     {
-                        image.create(screen_pxl_w, screen_pxl_h, bg_color);
-                        //I don't know why but putting this line in the render procedure won't work...
                         render();
                         draw();
                     }
+                }
+
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape) && fullscreen)
+                {
+                    window.create(sf::VideoMode(screen_pxl_w/2, screen_pxl_h/2), "RTX");
+                    resize();
+                    render();
+                    draw();
                 }
             }
         }
