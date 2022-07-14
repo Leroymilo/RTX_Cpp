@@ -1,18 +1,18 @@
 {
-    //Recommended dimensions.
-    //Virtual dimensions should be proportionnal to pixel dimensions.
-    "screen_pxl_w" : 1200,
-    "screen_pxl_h" : 900,
-    "pxl/virt_ratio" : 0.05,
-
-    "dist_origin_screen" : 80,
-    "dist_origin_cam" : 100,
-    "cam_rotation" : 45,
-    "cam_azimut" : 20,
-
-    "background_color" : {"r" : 20, "g" : 20, "b" : 20},
-
-    "max_reflections" : 2,
-
-    "multi_threading" : true
+	"background_color" : 
+	{
+		"b" : 20,
+		"g" : 20,
+		"r" : 20
+	},
+	"cam_azimut" : 60,
+	"cam_rotation" : 10.0,
+	"delta_rot" : 2,
+	"dist_cam_screen" : 40,
+	"dist_origin_cam" : 100,
+	"max_reflections" : 1,
+	"multi_threading" : true,
+	"pxl/virt_ratio" : 0.050000000000000003,
+	"screen_pxl_h" : 525,
+	"screen_pxl_w" : 840
 }

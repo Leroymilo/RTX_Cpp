@@ -9,6 +9,7 @@
 #include <fstream>
 #include <cmath>
 #include <filesystem>
+#include <algorithm>
 
 using namespace std;
 using namespace filesystem;
@@ -32,6 +33,7 @@ Point screen_pos;
 
 float rot;
 float azi;
+float delta_rot;
 Point camera_pos;
 
 constexpr double pi() { return atan(1)*4; }
@@ -56,6 +58,7 @@ file_time_type triangles_t = last_write_time("settings/triangles.json");
 // SFML variables :
 sf::RenderWindow window;
 bool fullscreen;
+bool was_fullscreen;
 
 
 //===========================================================================================================================================//
@@ -68,6 +71,7 @@ void read_settings()
     Json::Value actualJson;
     Json::Reader reader;
     reader.parse(file, actualJson);
+    file.close();
 
     screen_pxl_w = actualJson["screen_pxl_w"].asInt();
     screen_pxl_h = actualJson["screen_pxl_h"].asInt();
@@ -86,8 +90,8 @@ void read_settings()
     screen_w = virt_ratio*screen_pxl_w;
     screen_h = virt_ratio*screen_pxl_h;
 
-    float screen_r = actualJson["dist_origin_screen"].asFloat();
     float cam_r = actualJson["dist_origin_cam"].asFloat();
+    float screen_r = cam_r - actualJson["dist_cam_screen"].asFloat();
     rot = actualJson["cam_rotation"].asFloat()*pi()/180;
     azi = actualJson["cam_azimut"].asFloat()*pi()/180;
     camera_pos = Point(
@@ -108,6 +112,7 @@ void read_settings()
     );
 
     max_reflect = actualJson["max_reflections"].asInt();
+    delta_rot = actualJson["delta_rot"].asFloat();
 
     multithreading = actualJson["multi_threading"].asBool();
 }
@@ -117,7 +122,7 @@ void resize()
     screen_pxl_w = window.getSize().x, screen_pxl_h = window.getSize().y;
 
     sf::VideoMode vm = sf::VideoMode::getFullscreenModes()[0];
-    if (screen_pxl_w == vm.width)   // Not checking height because bar
+    if (screen_pxl_w == vm.width)   // Not checking height because title bar
     {
         fullscreen = true;
         screen_pxl_h = vm.height;
@@ -134,6 +139,7 @@ void read_sources()
     Json::Value actualJson;
     Json::Reader reader;
     reader.parse(file, actualJson);
+    file.close();
 
     sources.clear();
 
@@ -159,6 +165,7 @@ void read_spheres()
     Json::Value actualJson;
     Json::Reader reader;
     reader.parse(file, actualJson);
+    file.close();
 
     spheres.clear();
 
@@ -186,6 +193,7 @@ void read_triangles()
     Json::Value actualJson;
     Json::Reader reader;
     reader.parse(file, actualJson);
+    file.close();
 
     triangles.clear();
 
@@ -241,8 +249,35 @@ bool update_settings()
         triangles_t = last_write_time("settings/triangles.json");
         changed = true;
     }
-    cout << changed << endl;
     return changed;
+}
+
+void rotate(bool dir)
+{
+    ifstream infile("settings/settings.json");
+    Json::Value actualJson;
+    Json::Reader reader;
+    reader.parse(infile, actualJson);
+    infile.close();
+    float new_rot;
+    if (dir)
+        new_rot = fmod(actualJson["cam_rotation"].asInt() + delta_rot, 360);
+    else
+        new_rot = fmod(actualJson["cam_rotation"].asInt() - delta_rot, 360);
+    actualJson["cam_rotation"] = Json::Value(new_rot);
+    if (fullscreen)
+    {
+        actualJson["screen_pxl_h"] = Json::Value(-1);
+        actualJson["screen_pxl_w"] = Json::Value(-1);
+    }
+    else
+    {
+        actualJson["screen_pxl_h"] = Json::Value(screen_pxl_h);
+        actualJson["screen_pxl_w"] = Json::Value(screen_pxl_w);
+    }
+    ofstream outfile("settings/settings.json");
+    outfile << actualJson;
+    outfile.close();
 }
 
 
@@ -487,12 +522,16 @@ void draw()
     sf::Sprite sprite;
     sprite.setTexture(texture);
 
-    if (fullscreen)
+    if (fullscreen && !was_fullscreen)
+    {
         window.create(sf::VideoMode::getFullscreenModes()[0], "RTX", sf::Style::Fullscreen);
-    else
+        was_fullscreen = true;
+    }
+    else if (!fullscreen)
     {
         window.setSize(sf::Vector2u(screen_pxl_w, screen_pxl_h));
         window.setView(sf::View(sf::FloatRect(0, 0, screen_pxl_w, screen_pxl_h)));
+        was_fullscreen = false;
     }
     window.draw(sprite);
     window.display();
@@ -550,6 +589,30 @@ int main()
                 {
                     window.create(sf::VideoMode(screen_pxl_w/2, screen_pxl_h/2), "RTX");
                     resize();
+                    render();
+                    draw();
+                }
+
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
+                {
+                    int count = distance(directory_iterator("renders"), directory_iterator());
+                    std::stringstream ss;
+                    ss << "renders/render" << std::setfill('0') << std::setw(3) << count << ".png";
+                    image.saveToFile(ss.str());
+                }
+
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Add))
+                {
+                    rotate(true);
+                    read_settings();
+                    render();
+                    draw();
+                }
+
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Subtract))
+                {
+                    rotate(false);
+                    read_settings();
                     render();
                     draw();
                 }
