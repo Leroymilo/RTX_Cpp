@@ -1,0 +1,5 @@
+wxpython
+imageio
+PIL
+opencv-python
+pyinstaller
