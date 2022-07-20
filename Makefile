@@ -4,10 +4,10 @@ rtx.exe: base.o objects.o rtx.o
 rtx.o: rtx.cpp
 	g++ -Isrc\include -O3 -c rtx.cpp -DSFML_STATIC -static
 
-objects.o: objects.cpp objects.hpp
+objects.o: objects.cpp src\include\rtx\objects.hpp
 	g++ -Isrc\include -O3 -c objects.cpp -DSFML_STATIC -static
 
-base.o: base.cpp base.hpp
+base.o: base.cpp src\include\rtx\base.hpp
 	g++ -Isrc\include -O3 -c base.cpp -DSFML_STATIC -static
 
 clean:
