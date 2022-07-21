@@ -11,5 +11,9 @@ If all these conditions are met, you should be able to open a command prompt and
 ### To build the python video builder you'll need :
 - python 3.10.x
 
-Now you can type `pip install -r requirements.txt` in a command prompt in the project directory to install required libraries.</br>
-The executable video_builder will be in the folder "dist" (you can delete folders "build", "dist" and the file video_builder.spec once it's done.)
+Install required python libraries with `pip install -r requirements.txt` (or `pip3...` on Linux) in a command prompt in the project directory.
+
+On Windows you can type `auto-py-to-exe` to launch the executable builder and follow the instructions.</br>
+On other platforms, you should be able to use pyinstaller (`pyinstaller video_builder.py --onefile`) if you want an app</br>
+but the default window size and other stuff might be broken on Linux (I had some issues with wxPython on Linux),</br>
+so I'd recommend just typing `python video_builder.py` (or `python3...` on Linux)
