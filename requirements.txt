@@ -2,4 +2,4 @@ wxpython
 imageio
 PIL
 opencv-python==4.5.3.56
-pyinstaller
+auto-py-to-exe
