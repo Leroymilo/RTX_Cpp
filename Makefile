@@ -10,5 +10,5 @@ objects.o: objects.cpp objects.hpp
 base.o: base.cpp base.hpp
 	g++ -Isrc\include -O3 -c base.cpp -DSFML_STATIC -static
 
-clean:
+clear:
 	-rm *.o $(objects) rtx.exe

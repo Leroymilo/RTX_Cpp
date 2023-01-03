@@ -1,6 +1,6 @@
 .vscode
 *.exe
 *.o
-renders
+renders/*
 archives
 !src/**
