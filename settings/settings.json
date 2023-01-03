@@ -6,7 +6,7 @@
 		"r" : 20
 	},
 	"cam_azimut" : 60,
-	"cam_rotation" : 330.0,
+	"cam_rotation" : 176.0,
 	"delta_rot" : 2,
 	"dist_cam_screen" : 40,
 	"dist_origin_cam" : 100,
