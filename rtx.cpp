@@ -1,4 +1,4 @@
-#include "objects.hpp"
+#include "rtx/objects.hpp"
 
 #include <json/value.h>
 #include <json/json.h>
@@ -552,7 +552,10 @@ int main()
     read_triangles();
 
     if (fullscreen)
+    {
         window.create(sf::VideoMode::getFullscreenModes()[0], "RTX", sf::Style::Fullscreen);
+        was_fullscreen = true;
+    }
     else
         window.create(sf::VideoMode(screen_pxl_w, screen_pxl_h), "RTX");
     image.create(screen_pxl_w, screen_pxl_h, bg_color);

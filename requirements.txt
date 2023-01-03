@@ -1,0 +1,5 @@
+wxpython
+imageio
+PIL
+opencv-python==4.5.3.56
+auto-py-to-exe

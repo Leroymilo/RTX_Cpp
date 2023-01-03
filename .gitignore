@@ -3,4 +3,6 @@
 *.o
 renders/*
 archives
-!src/**
+dist
+build
+__pycache__
