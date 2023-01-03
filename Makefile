@@ -1,5 +1,5 @@
 lin: base.o objects.o rtx.o
-	g++ -O3 base.o objects.o rtx.o -o rtx -pthread -Lsrc/lib -Lsrc/lib -lsfml-graphics -lsfml-window -lsfml-system -ljsoncpp
+	g++ -O3 base.o objects.o rtx.o -o rtx.out -pthread -Lsrc/lib -Lsrc/lib -lsfml-graphics -lsfml-window -lsfml-system -ljsoncpp
 
 rtx.exe: base.o objects.o rtx.o
 	g++ -O3 base.o objects.o rtx.o -o rtx -pthread -Lsrc/lib -lsfml-graphics-s -lsfml-window-s -lsfml-system-s -lopengl32 -lwinmm -lgdi32 -ljsoncpp -static
@@ -14,4 +14,7 @@ base.o: base.cpp
 	g++ -Isrc/include -O3 -c base.cpp -DSFML_STATIC -static
 
 clear:
-	-rm *.o $(objects) rtx.exe
+	-rm *.o $(objects) rtx.exe rtx.out
+
+clear link:
+	-rm rtx.out rtx.exe
