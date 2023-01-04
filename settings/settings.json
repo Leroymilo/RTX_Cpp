@@ -6,13 +6,13 @@
 		"r" : 20
 	},
 	"cam_azimut" : 60,
-	"cam_rotation" : 284.0,
+	"cam_rotation" : 334.0,
 	"delta_rot" : 2,
 	"dist_cam_screen" : 40,
 	"dist_origin_cam" : 100,
 	"max_reflections" : 1,
 	"multi_threading" : true,
 	"pxl/virt_ratio" : 0.02,
-	"screen_pxl_h" : -1,
-	"screen_pxl_w" : -1
+	"screen_pxl_h" : 540,
+	"screen_pxl_w" : 960
 }

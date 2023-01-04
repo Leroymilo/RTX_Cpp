@@ -1,26 +1,27 @@
-lin: base.o objects.o rtx.o
-	g++ -O3 base.o objects.o rtx.o -o rtx.out -pthread -Lsrc/lib -Lsrc/lib -lsfml-graphics -lsfml-window -lsfml-system -ljsoncpp
+OBJ_DIR := ./objects
+LIB_DIR := src/lib
+INCLUDE := src/include
+LIBS_LIN := -pthread -L$(LIB_DIR) -lsfml-graphics -lsfml-window -lsfml-system -ljsoncpp
+LIBS_WIN := -pthread -L$(LIB_DIR) -lsfml-graphics-s -lsfml-window-s -lsfml-system-s -lopengl32 -lwinmm -lgdi32 -ljsoncpp -static
 
-win: base.o objects.o rtx.o
-	g++ -O3 base.o objects.o rtx.o -o rtx.exe -pthread -Lsrc/lib -lsfml-graphics-s -lsfml-window-s -lsfml-system-s -lopengl32 -lwinmm -lgdi32 -ljsoncpp -static
+SRC := $(wildcard src/*.cpp)
+OBJECTS  := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 
-rtx.o: rtx.cpp
-	g++ -Isrc/include -O3 -c rtx.cpp -DSFML_STATIC -static
+lin: $(OBJECTS)
+	g++ -O3 $(OBJECTS) -o rtx.out $(LIBS_LIN)
 
-objects.o: objects.cpp
-	g++ -Isrc/include -O3 -c objects.cpp -DSFML_STATIC -static
+win: $(OBJECTS)
+	g++ -O3 $(OBJECTS) -o rtx.exe $(LIBS_WIN)
 
-base.o: base.cpp
-	g++ -Isrc/include -O3 -c base.cpp -DSFML_STATIC -static
+$(OBJ_DIR)/%.o: %.cpp
+	@mkdir -p $(@D)
+	g++ -I$(INCLUDE) -O3 -c $< -o $@ -DSFML_STATIC -static
 
 clr_obj:
-	-rm *.o $(objects)
+	-rm -r objects
 
 clr_link:
 	[ ! -e rtx.exe ] || rm rtx.exe
 	[ ! -e rtx.out ] || rm rtx.out
 
 clear: clr_obj clr_link
-
-doc:
-	@echo "https://www.partow.net/programming/makefile/index.html"

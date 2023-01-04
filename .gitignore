@@ -1,5 +1,6 @@
 .vscode
 *.exe
+*.out
 *.o
 renders/*
 archives
